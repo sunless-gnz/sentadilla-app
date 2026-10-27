@@ -1,0 +1,1390 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#17232A">
+<title>Sentadilla IMU</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icono-192.png">
+<link rel="apple-touch-icon" href="icono-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #EEF1F0;
+  --surface: #FFFFFF;
+  --surface-2: #E2E8E6;
+  --ink: #17232A;
+  --ink-soft: #55646B;
+  --line: #C8D1CE;
+  --muslo: #1D6F8F;
+  --tronco: #A86B12;
+  --cadera: #6650A8;
+  --mal: #BF3434;
+  --mal-fondo: #F8E3E1;
+  --bien: #2C7A50;
+  --bien-fondo: #DDEFE4;
+  --boton: #17232A;
+  --boton-texto: #F4F7F6;
+  color-scheme: light;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0F171B;
+    --surface: #172227;
+    --surface-2: #1F2E34;
+    --ink: #E5ECEA;
+    --ink-soft: #98A9AF;
+    --line: #2C3D44;
+    --muslo: #55B6DB;
+    --tronco: #E9B04A;
+    --cadera: #AC9CEB;
+    --mal: #F2766C;
+    --mal-fondo: #3A1F1F;
+    --bien: #62C690;
+    --bien-fondo: #17352A;
+    --boton: #E5ECEA;
+    --boton-texto: #0F171B;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0F171B;
+  --surface: #172227;
+  --surface-2: #1F2E34;
+  --ink: #E5ECEA;
+  --ink-soft: #98A9AF;
+  --line: #2C3D44;
+  --muslo: #55B6DB;
+  --tronco: #E9B04A;
+  --cadera: #AC9CEB;
+  --mal: #F2766C;
+  --mal-fondo: #3A1F1F;
+  --bien: #62C690;
+  --bien-fondo: #17352A;
+  --boton: #E5ECEA;
+  --boton-texto: #0F171B;
+  color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: inherit; }
+html { height: 100%; scroll-padding-top: env(safe-area-inset-top, 0px); }
+body {
+  margin: 0; min-height: 100%;
+  background: var(--bg); color: var(--ink);
+  font-family: "Barlow", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 16px; line-height: 1.45;
+  -webkit-tap-highlight-color: transparent;
+}
+body::before {
+  content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px);
+  z-index: 10; background: var(--surface);
+}
+img, svg, canvas { max-width: 100%; }
+.cond { font-family: "Barlow Semi Condensed", "Barlow", system-ui, sans-serif; }
+.num { font-variant-numeric: tabular-nums; }
+h1, h2, h3 { font-family: "Barlow Semi Condensed", "Barlow", system-ui, sans-serif; margin: 0; line-height: 1.15; }
+h2 { font-size: 1.35rem; font-weight: 600; }
+h3 { font-size: 1.1rem; font-weight: 600; }
+p { margin: 0; }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--muslo); outline-offset: 2px; }
+
+/* ---------- Encabezado ---------- */
+.cabecera {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+  background: var(--surface); border-bottom: 1px solid var(--line);
+}
+.cabecera-in {
+  max-width: 600px; margin: 0 auto; padding: 10px 16px;
+  display: flex; align-items: center; gap: 12px;
+}
+.marca { font-family: "Barlow Semi Condensed", sans-serif; font-weight: 700; font-size: 1.2rem; letter-spacing: .01em; white-space: nowrap; }
+.estado-con { margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: .85rem; color: var(--ink-soft); text-align: right; line-height: 1.2; min-width: 0; }
+.punto { width: 10px; height: 10px; border-radius: 50%; background: var(--line); flex: none; }
+.punto.on { background: var(--bien); }
+.punto.demo { background: var(--cadera); }
+.punto.busy { background: var(--tronco); }
+
+main { max-width: 600px; margin: 0 auto; padding: 16px 16px 110px; }
+.vista { display: none; }
+.vista.activa { display: block; }
+.pila > * + * { margin-top: 16px; }
+
+/* ---------- Botones ---------- */
+.btn {
+  appearance: none; border: 1px solid var(--boton); background: var(--boton); color: var(--boton-texto);
+  border-radius: 10px; padding: 11px 16px; font-weight: 600; cursor: pointer; min-height: 46px;
+}
+.btn.sec { background: transparent; color: var(--ink); border-color: var(--line); }
+.btn.peligro { background: transparent; color: var(--mal); border-color: var(--mal); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn-fila { display: flex; gap: 10px; flex-wrap: wrap; }
+.btn-fila .btn { flex: 1 1 140px; }
+.enlace { background: none; border: 0; padding: 0; color: var(--muslo); font-weight: 600; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+
+/* ---------- Panel de conexión ---------- */
+.conexion {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px;
+}
+.conexion p { color: var(--ink-soft); margin-bottom: 12px; }
+.aviso {
+  border-left: 4px solid var(--tronco); background: var(--surface-2); padding: 10px 12px; border-radius: 0 8px 8px 0;
+  font-size: .95rem;
+}
+
+/* ---------- En vivo ---------- */
+.instrumento {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 14px 14px 10px;
+  display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 8px; align-items: center;
+}
+.figura-svg { width: 100%; height: auto; display: block; }
+.lecturas { display: grid; gap: 10px; }
+.lectura { border-left: 4px solid var(--c); padding-left: 10px; }
+.lectura span { display: block; font-size: .85rem; color: var(--ink-soft); }
+.lectura strong { font-family: "Barlow Semi Condensed", sans-serif; font-size: 2.6rem; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
+.lectura small { display: block; font-size: .85rem; color: var(--ink-soft); }
+.lectura.fuera strong { color: var(--mal); }
+.fase-linea {
+  grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: baseline;
+  border-top: 1px solid var(--line); padding-top: 8px; font-size: .95rem;
+}
+.fase-linea b { font-family: "Barlow Semi Condensed", sans-serif; font-size: 1.25rem; }
+.alerta-viva {
+  background: var(--mal); color: #fff; border-radius: 12px; padding: 12px 14px; font-weight: 600;
+  display: none;
+}
+.alerta-viva.visible { display: block; animation: entra .25s ease-out; }
+@keyframes entra { from { transform: translateY(-6px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .alerta-viva.visible { animation: none; } }
+.grafica-caja { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; }
+.grafica-caja canvas { width: 100%; height: 150px; display: block; }
+.leyenda { display: flex; gap: 14px; font-size: .85rem; color: var(--ink-soft); flex-wrap: wrap; }
+.leyenda i { display: inline-block; width: 14px; height: 3px; background: var(--c); vertical-align: middle; margin-right: 5px; border-radius: 2px; }
+.leyenda i.punteada { background: none; border-top: 2px dashed var(--c); height: 0; }
+.ultima { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
+.vacio { color: var(--ink-soft); text-align: center; padding: 28px 12px; }
+
+/* ---------- Repeticiones ---------- */
+.resumen-sesion { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.cifra { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+.cifra strong { display: block; font-family: "Barlow Semi Condensed", sans-serif; font-size: 1.9rem; font-weight: 600; line-height: 1.05; }
+.cifra span { font-size: .82rem; color: var(--ink-soft); }
+.controles-rep { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: space-between; }
+.controles-rep select { min-height: 42px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); padding: 0 10px; max-width: 100%; }
+.check { display: flex; gap: 8px; align-items: center; font-size: .95rem; }
+.check input { width: 20px; height: 20px; accent-color: var(--muslo); }
+.rep {
+  background: var(--surface); border: 1px solid var(--line); border-left: 6px solid var(--bien);
+  border-radius: 12px; overflow: hidden;
+}
+.rep.mal { border-left-color: var(--mal); }
+.rep summary {
+  list-style: none; cursor: pointer; padding: 12px 14px; display: grid;
+  grid-template-columns: 1fr auto; gap: 2px 10px; align-items: baseline;
+}
+.rep summary::-webkit-details-marker { display: none; }
+.rep summary h3 { font-size: 1.2rem; }
+.rep summary .meta { grid-column: 1 / -1; font-size: .88rem; color: var(--ink-soft); }
+.etiqueta { font-size: .85rem; font-weight: 600; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+.etiqueta.bien { background: var(--bien-fondo); color: var(--bien); }
+.etiqueta.mal { background: var(--mal-fondo); color: var(--mal); }
+.rep-cuerpo { padding: 0 14px 14px; }
+.traza { width: 100%; height: auto; display: block; margin-bottom: 8px; }
+.tabla-scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+th { text-align: left; font-weight: 500; color: var(--ink-soft); font-size: .8rem; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+td { padding: 7px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+td.v { font-variant-numeric: tabular-nums; white-space: nowrap; font-weight: 600; }
+tr.fuera td { background: var(--mal-fondo); }
+tr.fuera td.v { color: var(--mal); }
+tr.info td { color: var(--ink-soft); }
+.estado-icono { font-weight: 700; }
+.consejos { margin: 10px 0 0; padding-left: 18px; font-size: .93rem; }
+.consejos li + li { margin-top: 4px; }
+.dispositivo-nota { font-size: .88rem; color: var(--ink-soft); margin-top: 8px; }
+.rep-acciones { margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap; }
+.rep-acciones .btn { min-height: 40px; padding: 8px 12px; font-size: .92rem; }
+
+/* ---------- Perfil ---------- */
+.bloque { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+.bloque > h2 { margin-bottom: 4px; }
+.bloque > .ayuda { color: var(--ink-soft); font-size: .93rem; margin-bottom: 12px; }
+.medidas { display: grid; grid-template-columns: 170px 1fr; gap: 14px; align-items: start; }
+.extra-rep { font-size: .9rem; color: var(--ink-soft); margin-top: 8px; }
+.campos { display: grid; gap: 12px; }
+.campo label { display: block; font-weight: 600; font-size: .95rem; }
+.campo .ayuda { display: block; font-size: .82rem; color: var(--ink-soft); margin-bottom: 4px; }
+.campo .entrada { display: flex; align-items: center; gap: 8px; }
+.campo input, .campo select {
+  width: 100%; min-height: 44px; border-radius: 10px; border: 1px solid var(--line);
+  background: var(--bg); padding: 0 10px; font-variant-numeric: tabular-nums;
+}
+.campo .unidad { color: var(--ink-soft); font-size: .9rem; min-width: 22px; }
+.rejilla-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.proporciones { margin-top: 12px; font-size: .93rem; }
+.proporciones b { font-variant-numeric: tabular-nums; }
+.modelo-svg { width: 100%; height: auto; display: block; }
+.frase-modelo { font-size: 1rem; margin-top: 8px; }
+.frase-modelo b { font-variant-numeric: tabular-nums; }
+
+/* ---------- Historial ---------- */
+.sesion-fila {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px;
+  display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center;
+}
+.sesion-fila .meta { font-size: .88rem; color: var(--ink-soft); }
+.sesion-fila .acciones { grid-column: 1 / -1; display: flex; gap: 14px; margin-top: 6px; flex-wrap: wrap; }
+.barra-ok { height: 6px; border-radius: 3px; background: var(--mal-fondo); overflow: hidden; grid-column: 1 / -1; }
+.barra-ok i { display: block; height: 100%; background: var(--bien); }
+
+/* ---------- Navegación inferior ---------- */
+.nav {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 6;
+  background: var(--surface); border-top: 1px solid var(--line);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.nav-in { max-width: 600px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); }
+.nav a {
+  display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px 10px;
+  color: var(--ink-soft); text-decoration: none; font-size: .78rem; font-weight: 600; position: relative;
+}
+.nav a svg { width: 24px; height: 24px; }
+.nav a[aria-current="page"] { color: var(--ink); }
+.nav a[aria-current="page"]::before {
+  content: ""; position: absolute; top: 0; left: 25%; right: 25%; height: 3px; background: var(--muslo); border-radius: 0 0 3px 3px;
+}
+.contador-badge { position: absolute; top: 4px; left: 56%; background: var(--mal); color: #fff; font-size: .68rem; border-radius: 999px; padding: 0 5px; min-width: 16px; text-align: center; }
+
+.toast {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+  background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px; z-index: 20;
+  max-width: min(92vw, 520px); font-size: .95rem; display: none;
+}
+.toast.visible { display: block; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+@media (max-width: 420px) {
+  .lectura strong { font-size: 2.15rem; }
+  .medidas { grid-template-columns: 1fr; }
+  .medidas svg { max-width: 230px; width: 100%; margin: 0 auto; display: block; }
+}
+</style>
+</head>
+<body>
+
+<header class="cabecera">
+  <div class="cabecera-in">
+    <span class="marca">Sentadilla IMU</span>
+    <div class="estado-con" role="status" aria-live="polite">
+      <span class="punto" id="punto"></span><span id="textoEstado">Sin conectar</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <!-- ======================= EN VIVO ======================= -->
+  <section class="vista pila" id="vista-vivo" aria-label="En vivo">
+    <div class="conexion" id="panelConexion">
+      <h2>Conecta tu dispositivo</h2>
+      <p>Enciende el ESP32 y acércalo al teléfono. La app recibe los ángulos del muslo y del tronco en tiempo real.</p>
+      <div class="btn-fila">
+        <button class="btn" id="btnConectar">Conectar por Bluetooth</button>
+        <button class="btn sec" id="btnDemo">Probar sin dispositivo</button>
+      </div>
+      <p class="aviso" id="avisoBle" hidden style="margin-top:12px"></p>
+    </div>
+
+    <div class="alerta-viva" id="alertaViva" role="alert"></div>
+
+    <div class="instrumento" id="instrumento">
+      <svg class="figura-svg" id="figura" viewBox="0 0 220 250" role="img" aria-label="Figura con la postura actual"></svg>
+      <div class="lecturas">
+        <div class="lectura" style="--c:var(--muslo)" id="lecMuslo"><span>Muslo</span><strong class="num" id="vMuslo">–</strong><small>respecto a la vertical</small></div>
+        <div class="lectura" style="--c:var(--tronco)" id="lecTronco"><span>Tronco</span><strong class="num" id="vTronco">–</strong><small id="esperadoVivo">esperado –</small></div>
+        <div class="lectura" style="--c:var(--cadera)"><span>Flexión de cadera</span><strong class="num" id="vCadera">–</strong></div>
+      </div>
+      <div class="fase-linea">
+        <span>Fase: <b id="vFase">–</b></span>
+        <span>Repeticiones: <b class="num" id="vReps">0</b></span>
+      </div>
+    </div>
+
+    <div class="btn-fila" id="controlesSesion">
+      <button class="btn" id="btnSesion" disabled>Iniciar sesión</button>
+      <button class="btn sec" id="btnCal" disabled>Recalibrar</button>
+      <button class="btn sec" id="btnDesconectar" hidden>Desconectar</button>
+    </div>
+
+    <div class="grafica-caja">
+      <canvas id="grafica" aria-label="Gráfica de los últimos 10 segundos"></canvas>
+      <div class="leyenda">
+        <span><i style="--c:var(--muslo)"></i>Muslo</span>
+        <span><i style="--c:var(--tronco)"></i>Tronco</span>
+        <span><i class="punteada" style="--c:var(--mal)"></i>Límite de tronco del dispositivo</span>
+      </div>
+    </div>
+
+    <div class="ultima" id="ultimaRep"><p class="vacio">Cuando termines una repetición verás aquí su resultado.</p></div>
+  </section>
+
+  <!-- ======================= REPETICIONES ======================= -->
+  <section class="vista pila" id="vista-repeticiones" aria-label="Repeticiones">
+    <div class="controles-rep">
+      <select id="selSesion" aria-label="Sesión"></select>
+      <label class="check"><input type="checkbox" id="soloFuera"> Solo con parámetros fuera de rango</label>
+    </div>
+    <div class="resumen-sesion" id="resumenSesion"></div>
+    <div class="pila" id="listaReps"></div>
+  </section>
+
+  <!-- ======================= PERFIL ======================= -->
+  <section class="vista pila" id="vista-perfil" aria-label="Perfil">
+    <div class="bloque">
+      <h2>Medidas articulación a articulación</h2>
+      <p class="ayuda">Mide de pie, de lado, con cinta métrica y sobre los puntos óseos marcados. Con ellas la app calcula cuánto debe inclinarse tu tronco según tus proporciones.</p>
+      <div class="medidas">
+        <svg viewBox="0 0 170 300" role="img" aria-label="Puntos de referencia para medir tronco, fémur y tibia" id="diagramaMedidas"></svg>
+        <div class="campos">
+          <div class="rejilla-2">
+            <div class="campo"><label for="pEstatura">Estatura</label><div class="entrada"><input id="pEstatura" type="number" inputmode="decimal" min="120" max="220" step="0.5"><span class="unidad">cm</span></div></div>
+            <div class="campo"><label for="pMasa">Masa</label><div class="entrada"><input id="pMasa" type="number" inputmode="decimal" min="30" max="200" step="0.5"><span class="unidad">kg</span></div></div>
+          </div>
+          <button class="enlace" id="btnEstimar" type="button">Estimar las tres medidas desde la estatura</button>
+          <div class="campo"><label for="pTronco">Tronco</label><span class="ayuda">Trocánter mayor (cadera) hasta acromion (hombro)</span><div class="entrada"><input id="pTronco" type="number" inputmode="decimal" min="25" max="80" step="0.5"><span class="unidad">cm</span></div></div>
+          <div class="campo"><label for="pFemur">Fémur</label><span class="ayuda">Trocánter mayor hasta epicóndilo lateral (rodilla)</span><div class="entrada"><input id="pFemur" type="number" inputmode="decimal" min="25" max="70" step="0.5"><span class="unidad">cm</span></div></div>
+          <div class="campo"><label for="pTibia">Tibia</label><span class="ayuda">Epicóndilo lateral hasta maléolo lateral (tobillo)</span><div class="entrada"><input id="pTibia" type="number" inputmode="decimal" min="25" max="70" step="0.5"><span class="unidad">cm</span></div></div>
+        </div>
+      </div>
+      <p class="proporciones" id="proporciones"></p>
+    </div>
+
+    <div class="bloque">
+      <h2>Movilidad, objetivo y carga</h2>
+      <p class="ayuda">La dorsiflexión del tobillo decide cuánto pueden avanzar tus rodillas. Mídela en el test rodilla-pared apoyando el inclinómetro del teléfono sobre la tibia.</p>
+      <div class="campos">
+        <div class="rejilla-2">
+          <div class="campo"><label for="pDorsi">Dorsiflexión</label><div class="entrada"><input id="pDorsi" type="number" inputmode="decimal" min="10" max="55" step="1"><span class="unidad">°</span></div></div>
+          <div class="campo"><label for="pProf">Profundidad objetivo</label>
+            <select id="pProf">
+              <option value="70">Media, 70°</option>
+              <option value="90">Paralela, 90°</option>
+              <option value="110">Profunda, 110°</option>
+            </select></div>
+        </div>
+        <div class="rejilla-2">
+          <div class="campo"><label for="pCarga">Tipo de carga</label>
+            <select id="pCarga">
+              <option value="peso">Sin carga</option>
+              <option value="alta">Barra alta</option>
+              <option value="baja">Barra baja</option>
+              <option value="goblet">Goblet</option>
+            </select></div>
+          <div class="campo"><label for="pKg">Carga</label><div class="entrada"><input id="pKg" type="number" inputmode="decimal" min="0" max="400" step="1"><span class="unidad">kg</span></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bloque">
+      <h2>Rango esperado para ti</h2>
+      <p class="ayuda">Modelo de equilibrio en 2D: el centro de masa (cuerpo y carga) debe quedar sobre el pie. La franja es tu rango aceptable de tronco para cada profundidad.</p>
+      <svg class="modelo-svg" id="graficaModelo" viewBox="0 0 320 190" role="img" aria-label="Inclinación de tronco esperada según la inclinación del muslo"></svg>
+      <p class="frase-modelo" id="fraseModelo"></p>
+      <p class="dispositivo-nota" id="notaAjuste"></p>
+    </div>
+
+    <div class="bloque">
+      <h2>Tolerancias</h2>
+      <p class="ayuda">Valores de partida. Ajústalos con tu entrenador o fisioterapeuta.</p>
+      <div class="campos">
+        <div class="rejilla-2">
+          <div class="campo"><label for="pTol">Tolerancia del tronco</label><div class="entrada"><input id="pTol" type="number" inputmode="decimal" min="3" max="25" step="1"><span class="unidad">°</span></div></div>
+          <div class="campo"><label for="pTempo">Bajada mínima</label><div class="entrada"><input id="pTempo" type="number" inputmode="decimal" min="0.3" max="4" step="0.1"><span class="unidad">s</span></div></div>
+        </div>
+        <div class="rejilla-2">
+          <div class="campo"><label for="pRetro">Retroversión lumbar máx.</label><div class="entrada"><input id="pRetro" type="number" inputmode="decimal" min="3" max="30" step="1"><span class="unidad">°</span></div></div>
+          <div class="campo"><label for="pCaderaMax">Subida de cadera máx.</label><div class="entrada"><input id="pCaderaMax" type="number" inputmode="decimal" min="3" max="30" step="1"><span class="unidad">°</span></div></div>
+        </div>
+      </div>
+      <div class="btn-fila" style="margin-top:14px">
+        <button class="btn" id="btnEnviarUmbrales" disabled>Enviar límites al dispositivo</button>
+      </div>
+      <p class="dispositivo-nota" id="notaDispositivo">Conecta el dispositivo para enviarle tus límites. Quedan guardados en el ESP32.</p>
+    </div>
+  </section>
+
+  <!-- ======================= HISTORIAL ======================= -->
+  <section class="vista pila" id="vista-historial" aria-label="Historial">
+    <h2>Sesiones guardadas</h2>
+    <div class="pila" id="listaSesiones"></div>
+  </section>
+</main>
+
+<nav class="nav" aria-label="Secciones">
+  <div class="nav-in">
+    <a href="#vivo" data-vista="vivo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg>En vivo</a>
+    <a href="#repeticiones" data-vista="repeticiones">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Repeticiones<span class="contador-badge" id="badgeFuera" hidden></span></a>
+    <a href="#perfil" data-vista="perfil">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="4.5" r="2"/><path d="M12 7v6l-3 7M12 13l3 7M8 10h8"/></svg>Perfil</a>
+    <a href="#historial" data-vista="historial">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg>Historial</a>
+  </div>
+</nav>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+'use strict';
+// =====================================================================
+//  Constantes (deben coincidir con config.h del firmware)
+// =====================================================================
+const UUID = {
+  servicio: '8d4a97c5-2c09-4a21-8bfd-277abd61a373',
+  datos:    'a8899308-e154-4fa0-b59d-d1dee7addab9',
+  eventos:  '29e1fa91-1205-4d29-8cbe-758f7b58c2cc',
+  comandos: '030783da-bb2a-48dc-b4ed-b885e7c086de'
+};
+const CLAVE_PERFIL = 'sentadilla.perfil.v1';
+const CLAVE_SESIONES = 'sentadilla.sesiones.v1';
+const MAX_SESIONES = 40;
+const DT_ENVIO = 0.05;      // el firmware envía los ángulos a 20 Hz (FRECUENCIA_ENVIO_HZ)
+const FASES = ['De pie', 'Bajando', 'Subiendo'];
+const FALTAS_DISP = { 1: 'tronco muy inclinado', 2: 'retroversión pélvica', 4: 'la cadera subió antes que el pecho' };
+
+const $ = id => document.getElementById(id);
+const rad = d => d * Math.PI / 180;
+const grad = r => r * 180 / Math.PI;
+const limitar = (v, a, b) => Math.min(b, Math.max(a, v));
+const red = v => Math.round(v);
+const media = a => a.reduce((s, x) => s + x, 0) / (a.length || 1);
+
+const almacen = {
+  leer(k, def) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : def; } catch (e) { return def; } },
+  escribir(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } }
+};
+
+// =====================================================================
+//  Perfil del usuario
+// =====================================================================
+const PERFIL_DEFECTO = {
+  estatura: 170, masa: 65, femur: 41.5, tibia: 42, tronco: 49,
+  dorsiflexion: 35, profundidadObjetivo: 90, carga: 'peso', cargaKg: 0,
+  tolTronco: 10, retroMax: 10, caderaMax: 12, tempoMinBajada: 1.0,
+  referencias: []
+};
+let perfil = Object.assign({}, PERFIL_DEFECTO, almacen.leer(CLAVE_PERFIL, {}));
+if (!Array.isArray(perfil.referencias)) perfil.referencias = [];
+
+// =====================================================================
+//  Modelo biomecánico personalizado (plano sagital, 2D)
+//  Segmentos: tibia, fémur y tronco (cabeza-brazos-tronco, HAT).
+//  Fracciones de masa y centros de masa: Winter (2009).
+//  Condición de equilibrio: el centro de masa total queda sobre el pie
+//  (misma posición horizontal que de pie). Se resuelve la inclinación
+//  del tronco que lo cumple para una inclinación del muslo dada.
+// =====================================================================
+const Modelo = {
+  cargas: {
+    peso:   { k: 0,    adelante: 0,    nombre: 'sin carga externa' },
+    alta:   { k: 1.0,  adelante: 0,    nombre: 'barra alta' },
+    baja:   { k: 0.9,  adelante: 0,    nombre: 'barra baja' },
+    goblet: { k: 0.8,  adelante: 0.25, nombre: 'goblet' }
+  },
+  estimar(H) {   // Drillis y Contini: proporciones segmentarias respecto a la estatura
+    return { femur: +(0.245 * H).toFixed(1), tibia: +(0.246 * H).toFixed(1), tronco: +(0.288 * H).toFixed(1) };
+  },
+  // La tibia avanza sobre todo al inicio de la bajada y llega a la dorsiflexión máxima con el muslo paralelo
+  anguloTibia(p, muslo) { return p.dorsiflexion * Math.sin(rad(limitar(muslo, 0, 90))); },
+  troncoBase(p, muslo) {
+    const tm = rad(Math.max(0, muslo));
+    const ts = rad(Modelo.anguloTibia(p, muslo));
+    const xr = p.tibia * Math.sin(ts);              // rodilla
+    const xc = xr - p.femur * Math.sin(tm);         // cadera
+    const c = Modelo.cargas[p.carga] || Modelo.cargas.peso;
+    const mb = p.carga === 'peso' ? 0 : Math.max(0, +p.cargaKg || 0) / Math.max(30, +p.masa || 65);
+    const f = tt => {
+      const s = Math.sin(tt), co = Math.cos(tt);
+      return 2 * 0.0465 * 0.567 * xr
+           + 2 * 0.100 * (xc + 0.433 * p.femur * Math.sin(tm))
+           + 0.678 * (xc + 0.626 * p.tronco * s)
+           + mb * (xc + c.k * p.tronco * s + c.adelante * p.tronco * co);
+    };
+    let lo = rad(-20), hi = rad(89);
+    if (f(lo) >= 0) return { angulo: -20, factible: true };
+    if (f(hi) < 0) return { angulo: 89, factible: false };
+    for (let i = 0; i < 40; i++) { const m = (lo + hi) / 2; if (f(m) < 0) lo = m; else hi = m; }
+    return { angulo: grad((lo + hi) / 2), factible: true };
+  },
+  ajustePersonal(p) { return p.referencias.length ? media(p.referencias) : 0; },
+  esperado(p, muslo) {
+    const b = Modelo.troncoBase(p, muslo);
+    return { angulo: b.angulo + Modelo.ajustePersonal(p), factible: b.factible };
+  },
+  rango(p, muslo) {
+    const e = Modelo.esperado(p, muslo).angulo;
+    return { lo: Math.max(0, e - p.tolTronco - 5), hi: e + p.tolTronco, esperado: e };
+  },
+  // Límite absoluto que se envía al firmware (regla "tronco excesivo")
+  // Es un techo que se vigila durante toda la repetición: se toma el máximo del rango aceptable
+  limiteDispositivo(p) {
+    let max = 0;
+    for (let m = 20; m <= p.profundidadObjetivo + 15; m += 2) max = Math.max(max, Modelo.rango(p, m).hi);
+    return limitar(red(max), 15, 85);
+  }
+};
+
+// =====================================================================
+//  Análisis de una repetición
+// =====================================================================
+function analizarRep(ms, p) {
+  let iF = 0;
+  ms.forEach((s, i) => { if (s.m > ms[iF].m) iF = i; });
+  const prof = ms[iF].m;
+  const troncoFondo = media(ms.slice(Math.max(0, iF - 1), iF + 2).map(s => s.tr));
+  const tBajada = ms[iF].t - ms[0].t;
+  const tSubida = ms[ms.length - 1].t - ms[iF].t;
+
+  let pico = -Infinity, retro = 0;
+  for (let i = 0; i <= iF; i++) { pico = Math.max(pico, ms[i].tr); if (ms[i].m > 65) retro = Math.max(retro, pico - ms[i].tr); }
+  let subida = 0;
+  for (let i = iF + 1; i < ms.length; i++) subida = Math.max(subida, ms[i].tr - troncoFondo);
+  const flexCadera = Math.max(...ms.map(s => s.m + s.tr));
+  const troncoMax = Math.max(...ms.map(s => s.tr));
+
+  const r = Modelo.rango(p, prof);
+  const minProf = p.profundidadObjetivo - 10;
+  const aplicaRetro = prof > 65;
+
+  const params = [
+    { id: 'prof', nombre: 'Profundidad (inclinación del muslo)', valor: red(prof), u: '°',
+      rango: `≥ ${minProf}°`, ok: prof >= minProf,
+      consejo: `Bajaste hasta ${red(prof)}°; tu objetivo es ${p.profundidadObjetivo}°. Baja un poco más si no hay dolor.` },
+    { id: 'tronco', nombre: 'Inclinación del tronco en el fondo', valor: red(troncoFondo), u: '°',
+      rango: `${red(r.lo)}–${red(r.hi)}°`, ok: troncoFondo >= r.lo && troncoFondo <= r.hi,
+      consejo: troncoFondo > r.hi
+        ? `Te inclinaste ${red(troncoFondo - r.esperado)}° más de lo que tus proporciones necesitan. Pecho arriba y abdomen firme.`
+        : 'Tronco más vertical de lo que permite tu tobillo: revisa que los talones no se despeguen del suelo.' },
+    { id: 'retro', nombre: 'Retroversión lumbar en el fondo', valor: aplicaRetro ? red(retro) : null, u: '°',
+      rango: aplicaRetro ? `≤ ${p.retroMax}°` : 'no aplica', ok: !aplicaRetro || retro <= p.retroMax,
+      consejo: 'La pelvis rotó hacia atrás al llegar abajo (pérdida de la curva lumbar). Reduce la profundidad o trabaja movilidad de cadera.' },
+    { id: 'cadera', nombre: 'La cadera sube antes que el pecho', valor: red(subida), u: '°',
+      rango: `≤ ${p.caderaMax}°`, ok: subida <= p.caderaMax,
+      consejo: `Al subir, el tronco se inclinó ${red(subida)}° más. Empuja con todo el pie y sube pecho y cadera a la vez.` },
+    { id: 'tempo', nombre: 'Tiempo de bajada', valor: +tBajada.toFixed(1), u: ' s',
+      rango: `≥ ${p.tempoMinBajada} s`, ok: tBajada >= p.tempoMinBajada,
+      consejo: 'Bajaste muy rápido. Una bajada controlada protege rodillas y zona lumbar.' },
+    { id: 'flex', nombre: 'Flexión máxima de cadera', valor: red(flexCadera), u: '°', rango: 'referencia', ok: true, info: true },
+    { id: 'tsub', nombre: 'Tiempo de subida', valor: +tSubida.toFixed(1), u: ' s', rango: 'referencia', ok: true, info: true },
+    { id: 'tmax', nombre: 'Inclinación máxima del tronco', valor: red(troncoMax), u: '°', rango: 'referencia', ok: true, info: true }
+  ];
+  return {
+    params, prof: red(prof), troncoFondo, esperadoFondo: r.esperado, hiTronco: r.hi,
+    fuera: params.filter(x => !x.ok).length
+  };
+}
+
+function reducirTraza(ms, n = 80) {
+  const paso = Math.max(1, Math.ceil(ms.length / n));
+  const m = [], tr = [];
+  for (let i = 0; i < ms.length; i += paso) { m.push(red(ms[i].m)); tr.push(red(ms[i].tr)); }
+  return { m, tr, dur: +(ms[ms.length - 1].t - ms[0].t).toFixed(2) };
+}
+
+// =====================================================================
+//  Estado de la aplicación y sesiones
+// =====================================================================
+let sesiones = almacen.leer(CLAVE_SESIONES, []);
+if (!Array.isArray(sesiones)) sesiones = [];
+
+const app = {
+  modo: 'ninguno',          // 'ninguno' | 'ble' | 'demo'
+  enlace: null,
+  estadoDisp: 0,            // 0 reposo, 1 calibrando, 2 midiendo, 3 error
+  umbralesDisp: null,       // {T,R,H}
+  bateria: null,
+  sesion: null,
+  repBuf: null,
+  prerollo: [],             // muestras de pie justo antes de una repetición
+  ultimoReps: null,
+  alertasPorRep: {},
+  resumenPorRep: {},
+  vivo: { m: 0, tr: 0, c: 0, f: 0, r: 0, t: 0, hay: false },
+  historia: [],             // muestras de los últimos 10 s para la gráfica
+  sesionVista: null         // id de la sesión mostrada en Repeticiones
+};
+
+function guardarSesiones() {
+  if (sesiones.length > MAX_SESIONES) sesiones = sesiones.slice(-MAX_SESIONES);
+  if (!almacen.escribir(CLAVE_SESIONES, sesiones)) toast('No se pudo guardar el historial en este navegador.');
+}
+
+function nuevaSesion() {
+  app.sesion = {
+    id: 's' + Date.now(), inicio: Date.now(), fin: null, modo: app.modo,
+    perfil: { femur: perfil.femur, tibia: perfil.tibia, tronco: perfil.tronco, dorsiflexion: perfil.dorsiflexion,
+              profundidadObjetivo: perfil.profundidadObjetivo, carga: perfil.carga, cargaKg: perfil.cargaKg },
+    reps: []
+  };
+  sesiones.push(app.sesion);
+  app.sesionVista = app.sesion.id;
+  app.repBuf = null; app.prerollo = []; app.ultimoReps = null; app.alertasPorRep = {}; app.resumenPorRep = {};
+  pedirPantallaEncendida(true);
+  guardarSesiones();
+  renderTodo();
+}
+
+function cerrarSesion() {
+  if (!app.sesion) return;
+  app.sesion.fin = Date.now();
+  if (app.sesion.reps.length === 0) sesiones = sesiones.filter(s => s.id !== app.sesion.id);
+  else toast(`Sesión guardada: ${app.sesion.reps.length} repeticiones.`);
+  app.sesion = null; app.repBuf = null;
+  pedirPantallaEncendida(false);
+  guardarSesiones();
+  renderTodo();
+}
+
+function finalizarRep(n) {
+  const ms = app.repBuf.muestras.map((s, i) => Object.assign(s, { t: i * DT_ENVIO }));
+  app.repBuf = null;
+  if (!app.sesion || ms.length < 5) return;
+  const a = analizarRep(ms, perfil);
+  const rep = {
+    n, hora: Date.now(), traza: reducirTraza(ms), params: a.params, fuera: a.fuera, prof: a.prof,
+    troncoFondo: a.troncoFondo, esperadoFondo: a.esperadoFondo, hiTronco: a.hiTronco,
+    alertas: app.alertasPorRep[n] || 0, resumenDisp: app.resumenPorRep[n] || null, referencia: false
+  };
+  app.sesion.reps.push(rep);
+  guardarSesiones();
+  renderUltimaRep(rep);
+  renderReps();
+  actualizarBadge();
+}
+
+// =====================================================================
+//  Protocolo (mismo texto que envía el firmware)
+// =====================================================================
+function alRecibirDatos(texto) {
+  const p = texto.trim().split(',').map(Number);
+  if (p.length < 5 || p.some(isNaN)) return;
+  const [m, tr, c, f, r] = p;
+  const ahora = performance.now();
+  Object.assign(app.vivo, { m, tr, c, f, r, t: ahora, hay: true });
+  app.historia.push({ t: ahora, m, tr });
+  while (app.historia.length && ahora - app.historia[0].t > 10000) app.historia.shift();
+
+  if (app.sesion) {
+    if (app.ultimoReps === null) app.ultimoReps = r;
+    // El tiempo de cada muestra sale de su posición (20 Hz fijos en el firmware), no de la hora
+    // de llegada, porque el Bluetooth puede entregar notificaciones en ráfagas.
+    if (f !== 0) {
+      if (!app.repBuf) {
+        // La fase "bajando" empieza a 20° de muslo: se añaden las muestras desde que empezó a moverse
+        let i0 = app.prerollo.length;
+        while (i0 > 0 && app.prerollo[i0 - 1].m > 6) i0--;
+        app.repBuf = { muestras: app.prerollo.slice(i0) };
+      }
+      app.repBuf.muestras.push({ m, tr, f });
+      app.prerollo = [];
+    } else if (app.repBuf) {
+      app.repBuf.muestras.push({ m, tr, f });
+      if (r > app.ultimoReps) finalizarRep(r);
+      else app.repBuf = null;     // no llegó a la profundidad mínima: no cuenta
+    } else {
+      app.prerollo.push({ m, tr, f });
+      if (app.prerollo.length > 40) app.prerollo.shift();
+    }
+    app.ultimoReps = Math.max(app.ultimoReps, r);
+  }
+  renderVivo();
+}
+
+function alRecibirEvento(texto) {
+  const p = texto.trim().split(',');
+  const tipo = p[0];
+  if (tipo === 'A') {
+    const faltas = +p[1], rep = +p[2];
+    app.alertasPorRep[rep] = (app.alertasPorRep[rep] || 0) | faltas;
+    const textos = Object.keys(FALTAS_DISP).filter(b => faltas & b).map(b => FALTAS_DISP[b]);
+    mostrarAlerta('Alerta: ' + textos.join(' y '));
+  } else if (tipo === 'R') {
+    const n = +p[1];
+    app.resumenPorRep[n] = { prof: +p[2], troncoMax: +p[3], faltas: +p[4] };
+    const rep = app.sesion && app.sesion.reps.find(x => x.n === n);
+    if (rep) { rep.resumenDisp = app.resumenPorRep[n]; rep.alertas |= +p[4]; guardarSesiones(); }
+  } else if (tipo === 'S') {
+    app.estadoDisp = +p[1];
+    if (app.estadoDisp === 1) toast('Calibrando: quédate de pie y quieto 2 segundos.');
+    if (app.estadoDisp === 2 && !app.sesion) nuevaSesion();
+    if (app.estadoDisp === 0 && app.sesion) cerrarSesion();
+    if (app.estadoDisp === 3) toast('Una IMU no responde. Revisa los cables y la dirección AD0.');
+    renderEstado();
+  } else if (tipo === 'C') {
+    toast(p[1] === '0' ? 'Calibración lista. Empieza cuando quieras.' : 'Te moviste durante la calibración. Repitiendo…');
+  } else if (tipo === 'U') {
+    app.umbralesDisp = { T: +p[1], R: +p[2], H: +p[3] };
+    renderNotaDispositivo();
+  } else if (tipo === 'B') {
+    app.bateria = +p[2];
+    renderEstado();
+  }
+}
+
+// =====================================================================
+//  Conexión Bluetooth (Web Bluetooth)
+// =====================================================================
+class EnlaceBLE {
+  constructor() { this.cola = Promise.resolve(); this.dec = new TextDecoder(); this.enc = new TextEncoder(); this.manual = false; }
+  async conectar() {
+    this.dev = await navigator.bluetooth.requestDevice({
+      filters: [{ services: [UUID.servicio] }, { namePrefix: 'Sentadilla' }],
+      optionalServices: [UUID.servicio]
+    });
+    this.dev.addEventListener('gattserverdisconnected', () => this.alDesconectar());
+    await this.abrir();
+  }
+  async abrir() {
+    const servidor = await this.dev.gatt.connect();
+    const s = await servidor.getPrimaryService(UUID.servicio);
+    this.cDatos = await s.getCharacteristic(UUID.datos);
+    this.cEventos = await s.getCharacteristic(UUID.eventos);
+    this.cCmd = await s.getCharacteristic(UUID.comandos);
+    this.cDatos.addEventListener('characteristicvaluechanged', e => alRecibirDatos(this.dec.decode(e.target.value)));
+    this.cEventos.addEventListener('characteristicvaluechanged', e => alRecibirEvento(this.dec.decode(e.target.value)));
+    await this.cDatos.startNotifications();
+    await this.cEventos.startNotifications();
+    await this.enviar('U?');
+  }
+  enviar(txt) {
+    // Las escrituras GATT se encolan: el navegador no admite dos a la vez
+    this.cola = this.cola.then(async () => {
+      if (!this.cCmd) return;
+      const datos = this.enc.encode(txt);
+      if (this.cCmd.writeValueWithoutResponse) await this.cCmd.writeValueWithoutResponse(datos);
+      else await this.cCmd.writeValue(datos);
+      await new Promise(r => setTimeout(r, 60));
+    }).catch(err => console.warn('Escritura BLE', err));
+    return this.cola;
+  }
+  async alDesconectar() {
+    if (this.manual) return;
+    setEstadoConexion('busy', 'Reconectando…');
+    for (let intento = 0; intento < 5; intento++) {
+      await new Promise(r => setTimeout(r, 1000 * (intento + 1)));
+      try { await this.abrir(); setEstadoConexion('on', 'Conectado'); toast('Reconectado.'); renderEstado(); return; }
+      catch (e) { /* sigue intentando */ }
+    }
+    toast('Se perdió la conexión con el dispositivo.');
+    terminarConexion();
+  }
+  desconectar() { this.manual = true; if (this.dev && this.dev.gatt.connected) this.dev.gatt.disconnect(); }
+}
+
+async function conectarBLE() {
+  const aviso = $('avisoBle');
+  aviso.hidden = true;
+  if (!('bluetooth' in navigator)) {
+    aviso.textContent = 'Este navegador no tiene Bluetooth web. Abre la app desde su propio enlace en Chrome para Android, o en el navegador Bluefy en iPhone. Mientras tanto puedes usar “Probar sin dispositivo”.';
+    aviso.hidden = false;
+    return;
+  }
+  try {
+    const disponible = navigator.bluetooth.getAvailability ? await navigator.bluetooth.getAvailability() : true;
+    if (!disponible) { aviso.textContent = 'Activa el Bluetooth del teléfono e inténtalo de nuevo.'; aviso.hidden = false; return; }
+    setEstadoConexion('busy', 'Conectando…');
+    const enlace = new EnlaceBLE();
+    await enlace.conectar();
+    app.enlace = enlace; app.modo = 'ble';
+    setEstadoConexion('on', 'Conectado');
+    renderEstado();
+  } catch (e) {
+    setEstadoConexion('', 'Sin conectar');
+    if (e && e.name === 'NotFoundError') return;   // el usuario cerró el selector
+    aviso.textContent = (e && e.name === 'SecurityError')
+      ? 'Aquí el navegador bloquea el Bluetooth. Abre la app desde su propio enlace (por ejemplo, GitHub Pages) en Chrome para Android. Mientras tanto puedes usar “Probar sin dispositivo”.'
+      : 'No se pudo conectar: ' + (e && e.message ? e.message : e) + '. Comprueba que el ESP32 esté encendido y cerca.';
+    aviso.hidden = false;
+  }
+}
+
+function enviarComando(txt) { if (app.enlace) app.enlace.enviar(txt); }
+
+function terminarConexion() {
+  if (app.enlace) app.enlace.desconectar();
+  app.enlace = null; app.modo = 'ninguno'; app.estadoDisp = 0; app.umbralesDisp = null; app.bateria = null;
+  if (app.sesion) cerrarSesion();
+  app.vivo.hay = false;
+  setEstadoConexion('', 'Sin conectar');
+  renderEstado(); renderVivo();
+}
+
+// =====================================================================
+//  Modo demostración: simula el ESP32 con el mismo protocolo
+// =====================================================================
+class DetectorDemo {   // Copia de deteccion.h del firmware
+  constructor(u) { this.u = u; this.reiniciar(); }
+  reiniciar() { this.fase = 0; this.reps = 0; }
+  paso(m, t) {
+    let rep = null;
+    if (this.fase === 0) {
+      if (m > 20) { this.fase = 1; this.pico = m; this.prof = m; this.trF = t; this.trP = t; this.faltas = 0; }
+    } else if (this.fase === 1) {
+      if (m > this.pico) { this.pico = m; this.trF = t; }
+      if (m < this.pico - 5) { this.fase = 2; this.valle = m; }
+    } else {
+      if (m < this.valle) this.valle = m;
+      if (m > this.valle + 5) { this.fase = 1; this.pico = m; this.trF = t; }
+      else if (m < 12) {
+        this.fase = 0;
+        if (this.prof >= 45) { this.reps++; rep = { n: this.reps, prof: this.prof, tmax: this.trP, faltas: this.faltas }; }
+      }
+    }
+    if (this.fase === 0) return { nuevas: 0, rep };
+    this.prof = Math.max(this.prof, m); this.trP = Math.max(this.trP, t);
+    const conds = [t > this.u.T, this.fase === 1 && m > 65 && this.trP - t > this.u.R, this.fase === 2 && t - this.trF > this.u.H];
+    let nuevas = 0;
+    conds.forEach((c, i) => { const b = 1 << i; if (c && !(this.faltas & b)) { this.faltas |= b; nuevas |= b; } });
+    return { nuevas, rep };
+  }
+}
+
+class Simulador {
+  constructor() { this.u = { T: 45, R: 10, H: 12 }; this.det = new DetectorDemo(this.u); this.estado = 0; this.t = 0; }
+  conectar() {
+    this.timer = setInterval(() => this.tick(), 50);
+    setTimeout(() => { alRecibirEvento('S,0'); alRecibirEvento(`U,${this.u.T},${this.u.R},${this.u.H}`); alRecibirEvento('B,3960,74'); }, 150);
+  }
+  desconectar() { clearInterval(this.timer); }
+  enviar(cmd) {
+    cmd = cmd.trim().toUpperCase();
+    setTimeout(() => {
+      if (cmd === 'START' && this.estado !== 2) { this.calibrar(); this.det.reiniciar(); }
+      else if (cmd === 'STOP') { this.estado = 0; alRecibirEvento('S,0'); }
+      else if (cmd === 'CAL' && this.estado === 2) this.calibrar();
+      else if (cmd === 'U?') alRecibirEvento(`U,${this.u.T},${this.u.R},${this.u.H}`);
+      else if (/^[TRH]=/.test(cmd)) { this.u[cmd[0]] = +cmd.slice(2); alRecibirEvento(`U,${this.u.T},${this.u.R},${this.u.H}`); }
+    }, 80);
+    return Promise.resolve();
+  }
+  calibrar() { this.estado = 1; this.tCal = this.t; this.plan = null; alRecibirEvento('S,1'); }
+  ruido(a) { return (Math.random() + Math.random() + Math.random() - 1.5) * a; }
+  planificar() {
+    const r = Math.random();
+    const esc = r < 0.42 ? 'buena' : r < 0.57 ? 'tronco' : r < 0.71 ? 'retro' : r < 0.85 ? 'cadera' : r < 0.93 ? 'rapida' : 'corta';
+    this.plan = {
+      t0: this.t, esc, descanso: 1.6 + Math.random() * 1.2,
+      D: esc === 'rapida' ? 0.6 : 1.3 + Math.random() * 0.6, pausa: 0.15, A: 1.0 + Math.random() * 0.4,
+      prof: esc === 'corta' ? 60 + Math.random() * 6 : perfil.profundidadObjetivo - 3 + Math.random() * 12,
+      sesgo: this.ruido(3)
+    };
+  }
+  muestra() {
+    if (!this.plan) this.planificar();
+    const P = this.plan, s = this.t - P.t0;
+    let m, u, fase;
+    if (s < P.descanso) { m = 2 + this.ruido(1.2); u = 0; fase = 0; }
+    else if (s < P.descanso + P.D) { u = (s - P.descanso) / P.D; m = P.prof * (1 - Math.cos(Math.PI * u)) / 2; fase = 1; }
+    else if (s < P.descanso + P.D + P.pausa) { u = 1; m = P.prof; fase = 1; }
+    else if (s < P.descanso + P.D + P.pausa + P.A) { u = (s - P.descanso - P.D - P.pausa) / P.A; m = P.prof * (1 + Math.cos(Math.PI * u)) / 2; fase = 2; }
+    else { this.planificar(); return this.muestra(); }
+    m = Math.max(0, m + this.ruido(0.8));
+    let tr = Modelo.esperado(perfil, m).angulo + P.sesgo * (m / 90);
+    if (fase === 0) tr = 1 + this.ruido(1);
+    const k = m / Math.max(P.prof, 1);
+    if (P.esc === 'tronco') tr += 17 * k ** 1.5;
+    if (P.esc === 'retro' && fase === 1 && u > 0.7) tr -= 15 * Math.min(1, (u - 0.7) / 0.3);
+    if (P.esc === 'retro' && fase === 2 && u < 0.35) tr -= 15 * (1 - u / 0.35);
+    if (P.esc === 'cadera' && fase === 2 && u < 0.65) tr += 18 * Math.sin(Math.PI * u / 0.65);
+    tr += this.ruido(0.7);
+    return { m, tr };
+  }
+  tick() {
+    this.t += 0.05;
+    if (this.estado === 1) {
+      if (this.t - this.tCal > 2) { this.estado = 2; alRecibirEvento('C,0'); alRecibirEvento('S,2'); }
+      return;
+    }
+    if (this.estado !== 2) return;
+    const { m, tr } = this.muestra();
+    const r = this.det.paso(m, tr);
+    if (r.nuevas) alRecibirEvento(`A,${r.nuevas},${this.det.reps + 1}`);
+    if (r.rep) alRecibirEvento(`R,${r.rep.n},${red(r.rep.prof)},${red(r.rep.tmax)},${r.rep.faltas}`);
+    alRecibirDatos(`${red(m)},${red(tr)},${red(m + tr)},${this.det.fase},${this.det.reps}`);
+  }
+}
+
+function iniciarDemo() {
+  $('avisoBle').hidden = true;
+  const sim = new Simulador();
+  app.enlace = sim; app.modo = 'demo';
+  sim.conectar();
+  setEstadoConexion('demo', 'Demostración');
+  renderEstado();
+  toast('Modo demostración: datos simulados con tu perfil.');
+}
+
+// =====================================================================
+//  Interfaz
+// =====================================================================
+let tToast = 0;
+function toast(msg) {
+  const el = $('toast'); el.textContent = msg; el.classList.add('visible');
+  clearTimeout(tToast); tToast = setTimeout(() => el.classList.remove('visible'), 3200);
+}
+let tAlerta = 0;
+function mostrarAlerta(msg) {
+  const el = $('alertaViva'); el.textContent = msg; el.classList.add('visible');
+  clearTimeout(tAlerta); tAlerta = setTimeout(() => el.classList.remove('visible'), 2600);
+}
+function setEstadoConexion(clase, texto) {
+  $('punto').className = 'punto ' + clase;
+  app.textoConexion = texto;
+  renderEstadoTexto();
+}
+function renderEstadoTexto() {
+  let t = app.textoConexion || 'Sin conectar';
+  if (app.bateria !== null && app.modo !== 'ninguno') t += `, batería ${app.bateria} %`;
+  $('textoEstado').textContent = t;
+}
+
+let wakeLock = null;
+async function pedirPantallaEncendida(si) {
+  try {
+    if (si && 'wakeLock' in navigator && !wakeLock) { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => { wakeLock = null; }); }
+    if (!si && wakeLock) { await wakeLock.release(); wakeLock = null; }
+  } catch (e) { /* sin bloqueo de pantalla */ }
+}
+
+function renderEstado() {
+  const con = app.modo !== 'ninguno';
+  $('panelConexion').hidden = con;
+  $('btnDesconectar').hidden = !con;
+  $('btnDesconectar').textContent = app.modo === 'demo' ? 'Salir de la demostración' : 'Desconectar';
+  const midiendo = app.estadoDisp === 1 || app.estadoDisp === 2;
+  $('btnSesion').disabled = !con;
+  $('btnSesion').textContent = midiendo ? 'Terminar sesión' : 'Iniciar sesión';
+  $('btnCal').disabled = !(con && app.estadoDisp === 2);
+  $('btnEnviarUmbrales').disabled = !con;
+  renderEstadoTexto();
+  renderNotaDispositivo();
+}
+
+function renderNotaDispositivo() {
+  const nota = $('notaDispositivo');
+  const T = Modelo.limiteDispositivo(perfil);
+  if (app.modo === 'ninguno') { nota.textContent = `Conecta el dispositivo para enviarle tus límites (tronco ${T}°, retroversión ${perfil.retroMax}°, cadera ${perfil.caderaMax}°). Quedan guardados en el ESP32.`; return; }
+  const u = app.umbralesDisp;
+  if (!u) { nota.textContent = 'Leyendo los límites del dispositivo…'; return; }
+  const iguales = u.T === T && u.R === red(perfil.retroMax) && u.H === red(perfil.caderaMax);
+  nota.textContent = iguales
+    ? `El dispositivo ya usa tus límites: tronco ${u.T}°, retroversión ${u.R}°, cadera ${u.H}°.`
+    : `El dispositivo usa tronco ${u.T}°, retroversión ${u.R}°, cadera ${u.H}°. Tu perfil recomienda ${T}°, ${red(perfil.retroMax)}° y ${red(perfil.caderaMax)}°.`;
+}
+
+// ---------- Figura en vivo ----------
+const NS = 'http://www.w3.org/2000/svg';
+function pt(cx, cy, r, aGrados) { const a = rad(aGrados); return [cx + r * Math.sin(a), cy - r * Math.cos(a)]; }
+function arco(cx, cy, r, a1, a2) {
+  if (Math.abs(a2 - a1) < 0.5) return '';
+  const [x1, y1] = pt(cx, cy, r, a1), [x2, y2] = pt(cx, cy, r, a2);
+  const grande = Math.abs(a2 - a1) > 180 ? 1 : 0, dir = a2 > a1 ? 1 : 0;
+  return `M${x1.toFixed(1)},${y1.toFixed(1)} A${r},${r} 0 ${grande} ${dir} ${x2.toFixed(1)},${y2.toFixed(1)}`;
+}
+function dibujarFigura(m, tr, fueraTronco) {
+  const p = perfil;
+  const total = p.tibia + p.femur + p.tronco * 1.28;
+  const e = 205 / total;
+  const ts = Modelo.anguloTibia(p, m);
+  const tob = [95, 228];
+  const rod = [tob[0] + p.tibia * e * Math.sin(rad(ts)), tob[1] - p.tibia * e * Math.cos(rad(ts))];
+  const cad = [rod[0] - p.femur * e * Math.sin(rad(m)), rod[1] - p.femur * e * Math.cos(rad(m))];
+  const hom = [cad[0] + p.tronco * e * Math.sin(rad(tr)), cad[1] - p.tronco * e * Math.cos(rad(tr))];
+  const cab = pt(hom[0], hom[1], p.tronco * e * 0.2, tr);
+  const esp = Modelo.esperado(p, m).angulo;
+  const ghost = pt(cad[0], cad[1], p.tronco * e, esp);
+  const sensMuslo = [cad[0] + (rod[0] - cad[0]) * 0.72, cad[1] + (rod[1] - cad[1]) * 0.72];
+  const sensLumbar = pt(cad[0], cad[1], p.tronco * e * 0.12, tr);
+  const colTronco = fueraTronco ? 'var(--mal)' : 'var(--tronco)';
+  const pie = `M${tob[0] - 12},${tob[1] + 6} L${tob[0] + 30},${tob[1] + 6}`;
+  $('figura').innerHTML = `
+    <line x1="10" y1="${tob[1] + 7}" x2="210" y2="${tob[1] + 7}" stroke="var(--line)" stroke-width="2"/>
+    <path d="${pie}" stroke="var(--ink-soft)" stroke-width="6" stroke-linecap="round"/>
+    <line x1="${cad[0]}" y1="${cad[1]}" x2="${ghost[0]}" y2="${ghost[1]}" stroke="var(--ink-soft)" stroke-width="2" stroke-dasharray="5 5"/>
+    <path d="${arco(cad[0], cad[1], 26, 180 - m, 180)}" fill="none" stroke="var(--muslo)" stroke-width="2"/>
+    <path d="${arco(cad[0], cad[1], 34, 0, tr)}" fill="none" stroke="${colTronco}" stroke-width="2"/>
+    <line x1="${tob[0]}" y1="${tob[1]}" x2="${rod[0]}" y2="${rod[1]}" stroke="var(--ink-soft)" stroke-width="9" stroke-linecap="round"/>
+    <line x1="${rod[0]}" y1="${rod[1]}" x2="${cad[0]}" y2="${cad[1]}" stroke="var(--muslo)" stroke-width="11" stroke-linecap="round"/>
+    <line x1="${cad[0]}" y1="${cad[1]}" x2="${hom[0]}" y2="${hom[1]}" stroke="${colTronco}" stroke-width="13" stroke-linecap="round"/>
+    <circle cx="${cab[0]}" cy="${cab[1]}" r="${(p.tronco * e * 0.13).toFixed(1)}" fill="var(--surface)" stroke="var(--ink-soft)" stroke-width="3"/>
+    <rect x="${sensMuslo[0] - 5}" y="${sensMuslo[1] - 5}" width="10" height="10" rx="2" fill="var(--surface)" stroke="var(--ink)" stroke-width="2"/>
+    <rect x="${sensLumbar[0] - 5}" y="${sensLumbar[1] - 5}" width="10" height="10" rx="2" fill="var(--surface)" stroke="var(--ink)" stroke-width="2"/>
+    <circle cx="${cad[0]}" cy="${cad[1]}" r="4" fill="var(--ink)"/>
+    <circle cx="${rod[0]}" cy="${rod[1]}" r="4" fill="var(--ink)"/>`;
+}
+
+function renderVivo() {
+  const v = app.vivo;
+  if (!v.hay) {
+    ['vMuslo', 'vTronco', 'vCadera'].forEach(id => $(id).textContent = '–');
+    $('vFase').textContent = '–'; $('esperadoVivo').textContent = 'esperado –';
+    dibujarFigura(0, 0, false);
+    return;
+  }
+  const r = Modelo.rango(perfil, v.m);
+  const fuera = v.f !== 0 && (v.tr > r.hi);
+  $('vMuslo').textContent = v.m + '°';
+  $('vTronco').textContent = v.tr + '°';
+  $('vCadera').textContent = (v.m + v.tr) + '°';
+  $('esperadoVivo').textContent = v.f === 0 ? 'de pie, referencia 0°' : `esperado ${red(r.lo)}–${red(r.hi)}°`;
+  $('lecTronco').classList.toggle('fuera', fuera);
+  $('vFase').textContent = FASES[v.f] || '–';
+  $('vReps').textContent = v.r;
+  dibujarFigura(v.m, v.tr, fuera);
+}
+
+// ---------- Gráfica de 10 s ----------
+function dibujarGrafica() {
+  const cv = $('grafica');
+  if ($('vista-vivo').classList.contains('activa')) {
+    const dpr = window.devicePixelRatio || 1;
+    const w = cv.clientWidth, h = cv.clientHeight;
+    if (cv.width !== w * dpr || cv.height !== h * dpr) { cv.width = w * dpr; cv.height = h * dpr; }
+    const ctx = cv.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    const cs = getComputedStyle(document.documentElement);
+    const col = n => cs.getPropertyValue(n).trim();
+    const yMin = -10, yMax = 130;
+    const y = v => h - 4 - (v - yMin) / (yMax - yMin) * (h - 8);
+    ctx.font = '11px Barlow, sans-serif'; ctx.fillStyle = col('--ink-soft'); ctx.strokeStyle = col('--line'); ctx.lineWidth = 1;
+    [0, 45, 90].forEach(g => { ctx.beginPath(); ctx.moveTo(26, y(g)); ctx.lineTo(w, y(g)); ctx.stroke(); ctx.fillText(g + '°', 0, y(g) + 4); });
+    const lim = app.umbralesDisp ? app.umbralesDisp.T : Modelo.limiteDispositivo(perfil);
+    ctx.setLineDash([5, 5]); ctx.strokeStyle = col('--mal'); ctx.beginPath(); ctx.moveTo(26, y(lim)); ctx.lineTo(w, y(lim)); ctx.stroke(); ctx.setLineDash([]);
+    const ahora = performance.now();
+    const x = t => 26 + (1 - (ahora - t) / 10000) * (w - 26);
+    const linea = (clave, color) => {
+      ctx.strokeStyle = color; ctx.lineWidth = 2.5; ctx.lineJoin = 'round'; ctx.beginPath();
+      app.historia.forEach((s, i) => { const px = x(s.t), py = y(s[clave]); i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); });
+      ctx.stroke();
+    };
+    linea('m', col('--muslo')); linea('tr', col('--tronco'));
+    if (!app.historia.length) { ctx.fillStyle = col('--ink-soft'); ctx.font = '14px Barlow, sans-serif'; ctx.textAlign = 'center'; ctx.fillText('Sin datos: inicia una sesión', w / 2, h / 2); ctx.textAlign = 'left'; }
+  }
+  requestAnimationFrame(dibujarGrafica);
+}
+
+// ---------- Repeticiones ----------
+function trazaSVG(rep) {
+  const W = 320, H = 80, tr = rep.traza;
+  const n = tr.m.length; if (n < 2) return '';
+  const x = i => 4 + i / (n - 1) * (W - 8);
+  const y = v => H - 6 - (limitar(v, -10, 130) + 10) / 140 * (H - 12);
+  const linea = arr => arr.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+  const iF = tr.m.indexOf(Math.max(...tr.m));
+  const tronco = rep.params.find(p => p.id === 'tronco');
+  const hi = rep.hiTronco;
+  return `<svg class="traza" viewBox="0 0 ${W} ${H}" role="img" aria-label="Curvas de muslo y tronco de la repetición ${rep.n}">
+    <line x1="${x(iF)}" y1="4" x2="${x(iF)}" y2="${H - 4}" stroke="var(--line)" stroke-width="1.5"/>
+    <line x1="4" y1="${y(hi)}" x2="${W - 4}" y2="${y(hi)}" stroke="${tronco && !tronco.ok ? 'var(--mal)' : 'var(--ink-soft)'}" stroke-width="1" stroke-dasharray="4 4"/>
+    <path d="${linea(tr.m)}" fill="none" stroke="var(--muslo)" stroke-width="2.2" stroke-linejoin="round"/>
+    <path d="${linea(tr.tr)}" fill="none" stroke="var(--tronco)" stroke-width="2.2" stroke-linejoin="round"/>
+    <text x="8" y="14" font-size="11" fill="var(--muslo)" font-family="Barlow, sans-serif">Muslo</text>
+    <text x="50" y="14" font-size="11" fill="var(--tronco)" font-family="Barlow, sans-serif">Tronco</text>
+    <text x="${W - 6}" y="14" text-anchor="end" font-size="11" fill="var(--ink-soft)" font-family="Barlow, sans-serif">${tr.dur} s</text>
+  </svg>`;
+}
+
+function textoAlertas(bits) {
+  return Object.keys(FALTAS_DISP).filter(b => bits & b).map(b => FALTAS_DISP[b]).join(', ');
+}
+
+function htmlRep(rep, sesionId, editable) {
+  const mal = rep.fuera > 0;
+  const hora = new Date(rep.hora).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const filas = rep.params.filter(p => !p.info).map(p => {
+    const v = p.valor === null ? '—' : p.valor + p.u;
+    const cls = p.info ? 'info' : (p.ok ? '' : 'fuera');
+    const icono = p.info ? '' : (p.ok ? '<span class="estado-icono" style="color:var(--bien)" aria-label="En rango">✓</span>' : '<span class="estado-icono" style="color:var(--mal)" aria-label="Fuera de rango">✕</span>');
+    return `<tr class="${cls}"><td>${p.nombre}</td><td class="v">${v}</td><td>${p.rango}</td><td>${icono}</td></tr>`;
+  }).join('');
+  const consejos = rep.params.filter(p => !p.ok).map(p => `<li>${p.consejo}</li>`).join('');
+  const extra = rep.params.filter(p => p.info).map(p => `${p.nombre.toLowerCase()} ${p.valor}${p.u}`).join(', ');
+  const disp = rep.alertas ? `<p class="dispositivo-nota">El dispositivo vibró por: ${textoAlertas(rep.alertas)}.</p>` : '';
+  const acciones = editable ? `<div class="rep-acciones">
+      <button class="btn sec" data-ref="${sesionId}|${rep.n}">${rep.referencia ? 'Quitar de referencia' : 'Marcar como técnica correcta'}</button></div>` : '';
+  return `<details class="rep ${mal ? 'mal' : ''}" ${mal ? 'open' : ''}>
+    <summary>
+      <h3>Repetición ${rep.n}</h3>
+      <span class="etiqueta ${mal ? 'mal' : 'bien'}">${mal ? rep.fuera + ' fuera de rango' : 'Todo en rango'}</span>
+      <span class="meta">Profundidad ${rep.prof}°, tronco ${red(rep.troncoFondo)}° (esperado ${red(rep.esperadoFondo)}°), ${hora}${rep.referencia ? ', usada como referencia' : ''}</span>
+    </summary>
+    <div class="rep-cuerpo">
+      ${trazaSVG(rep)}
+      <div class="tabla-scroll"><table>
+        <thead><tr><th>Parámetro</th><th>Medido</th><th>Rango esperado</th><th><span class="sr">Estado</span></th></tr></thead>
+        <tbody>${filas}</tbody></table></div>
+      <p class="extra-rep">También: ${extra}.</p>
+      ${consejos ? `<ul class="consejos">${consejos}</ul>` : ''}
+      ${disp}${acciones}
+    </div></details>`;
+}
+
+function sesionMostrada() {
+  return sesiones.find(s => s.id === app.sesionVista) || app.sesion || sesiones[sesiones.length - 1] || null;
+}
+
+function renderReps() {
+  const sel = $('selSesion');
+  const lista = sesiones.slice().reverse();
+  sel.innerHTML = lista.map(s => {
+    const f = new Date(s.inicio).toLocaleString('es-CO', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+    return `<option value="${s.id}">${s === app.sesion ? 'Sesión actual' : f}${s.modo === 'demo' ? ' (demostración)' : ''}, ${s.reps.length} rep.</option>`;
+  }).join('');
+  const s = sesionMostrada();
+  if (s) sel.value = s.id;
+  sel.hidden = !lista.length;
+  const cont = $('listaReps'), res = $('resumenSesion');
+  if (!s || !s.reps.length) {
+    res.innerHTML = '';
+    cont.innerHTML = `<p class="vacio">${app.sesion ? 'Haz tu primera repetición: aparecerá aquí con sus parámetros.' : 'Aún no hay repeticiones. Conecta el dispositivo e inicia una sesión.'}</p>`;
+    $('soloFuera').parentElement.hidden = true;
+    return;
+  }
+  $('soloFuera').parentElement.hidden = false;
+  const malas = s.reps.filter(r => r.fuera > 0);
+  const conteo = {};
+  malas.forEach(r => r.params.filter(p => !p.ok).forEach(p => { conteo[p.nombre] = (conteo[p.nombre] || 0) + 1; }));
+  const frecuente = Object.entries(conteo).sort((a, b) => b[1] - a[1])[0];
+  res.innerHTML = `
+    <div class="cifra"><strong class="num">${s.reps.length}</strong><span>repeticiones</span></div>
+    <div class="cifra"><strong class="num">${red(100 * (s.reps.length - malas.length) / s.reps.length)} %</strong><span>todo en rango</span></div>
+    <div class="cifra"><strong class="num">${red(media(s.reps.map(r => r.prof)))}°</strong><span>profundidad media</span></div>
+    ${frecuente ? `<p style="grid-column:1/-1;font-size:.93rem">Lo que más se salió de rango: <b>${frecuente[0].toLowerCase()}</b> (${frecuente[1]} de ${s.reps.length}).</p>` : ''}`;
+  const filtro = $('soloFuera').checked;
+  const reps = s.reps.slice().reverse().filter(r => !filtro || r.fuera > 0);
+  cont.innerHTML = reps.length ? reps.map(r => htmlRep(r, s.id, true)).join('') : '<p class="vacio">Ninguna repetición se salió de rango en esta sesión.</p>';
+}
+
+function renderUltimaRep(rep) {
+  const caja = $('ultimaRep');
+  const fuera = rep.params.filter(p => !p.ok);
+  caja.innerHTML = `<h3 style="margin-bottom:6px">Repetición ${rep.n}: ${fuera.length ? fuera.length + ' fuera de rango' : 'todo en rango'}</h3>
+    ${fuera.length ? '<ul class="consejos" style="margin-top:0">' + fuera.map(p => `<li><b>${p.nombre}:</b> ${p.valor === null ? '' : p.valor + p.u} (esperado ${p.rango})</li>`).join('') + '</ul>' : `<p>Profundidad ${rep.prof}° y tronco ${red(rep.troncoFondo)}°, dentro de tu rango.</p>`}
+    <p style="margin-top:8px"><a class="enlace" href="#repeticiones">Ver el detalle de cada repetición</a></p>`;
+}
+
+function actualizarBadge() {
+  const b = $('badgeFuera');
+  const n = app.sesion ? app.sesion.reps.filter(r => r.fuera > 0).length : 0;
+  b.hidden = n === 0; b.textContent = n;
+}
+
+// ---------- Perfil ----------
+const CAMPOS = [
+  ['pEstatura', 'estatura'], ['pMasa', 'masa'], ['pFemur', 'femur'], ['pTibia', 'tibia'], ['pTronco', 'tronco'],
+  ['pDorsi', 'dorsiflexion'], ['pProf', 'profundidadObjetivo'], ['pCarga', 'carga'], ['pKg', 'cargaKg'],
+  ['pTol', 'tolTronco'], ['pRetro', 'retroMax'], ['pCaderaMax', 'caderaMax'], ['pTempo', 'tempoMinBajada']
+];
+function llenarPerfil() { CAMPOS.forEach(([id, k]) => { $(id).value = perfil[k]; }); $('pKg').disabled = perfil.carga === 'peso'; }
+function leerPerfil() {
+  CAMPOS.forEach(([id, k]) => {
+    const el = $(id);
+    if (k === 'carga') { perfil[k] = el.value; return; }
+    const v = parseFloat(el.value);
+    if (!isNaN(v)) perfil[k] = limitar(v, +el.min || 0, +el.max || 1e9);
+  });
+  $('pKg').disabled = perfil.carga === 'peso';
+  almacen.escribir(CLAVE_PERFIL, perfil);
+}
+
+function renderProporciones() {
+  const fT = perfil.femur / perfil.tronco, fTi = perfil.femur / perfil.tibia;
+  let txt = `Fémur/tronco: <b>${fT.toFixed(2)}</b>. Fémur/tibia: <b>${fTi.toFixed(2)}</b>. `;
+  txt += fT > 0.92 ? 'Tu fémur es largo respecto al tronco: necesitarás más inclinación de tronco que el promedio, y eso no es un error.'
+       : fT < 0.78 ? 'Tu tronco es largo respecto al fémur: puedes hacer la sentadilla con el tronco bastante vertical.'
+       : 'Proporciones cercanas al promedio.';
+  $('proporciones').innerHTML = txt;
+}
+
+function renderDiagrama() {
+  // Figura de pie, de lado, con los puntos de referencia óseos
+  const p = perfil, total = p.tronco * 1.3 + p.femur + p.tibia, e = 262 / total;
+  const xb = 52, tob = 282, rod = tob - p.tibia * e, cad = rod - p.femur * e, hom = cad - p.tronco * e;
+  const fuente = 'font-family="Barlow, sans-serif"';
+  const cota = (y1, y2, txt) => `<line x1="20" y1="${y1}" x2="20" y2="${y2}" stroke="var(--ink-soft)" stroke-width="1.2"/>
+    <line x1="15" y1="${y1}" x2="25" y2="${y1}" stroke="var(--ink-soft)"/><line x1="15" y1="${y2}" x2="25" y2="${y2}" stroke="var(--ink-soft)"/>
+    <text x="11" y="${(y1 + y2) / 2}" transform="rotate(-90 11 ${(y1 + y2) / 2})" text-anchor="middle" font-size="11" fill="var(--ink)" ${fuente}>${txt}</text>`;
+  const punto = (y, nombre) => `<circle cx="${xb}" cy="${y}" r="5" fill="var(--surface)" stroke="var(--ink)" stroke-width="2"/>
+    <text x="${xb + 12}" y="${y + 4}" font-size="11" fill="var(--ink)" ${fuente}>${nombre}</text>`;
+  $('diagramaMedidas').innerHTML = `
+    <circle cx="${xb + 2}" cy="${hom - p.tronco * e * 0.22}" r="${p.tronco * e * 0.14}" fill="none" stroke="var(--ink-soft)" stroke-width="2.5"/>
+    <line x1="${xb}" y1="${hom}" x2="${xb}" y2="${cad}" stroke="var(--tronco)" stroke-width="10" stroke-linecap="round"/>
+    <line x1="${xb}" y1="${cad}" x2="${xb}" y2="${rod}" stroke="var(--muslo)" stroke-width="10" stroke-linecap="round"/>
+    <line x1="${xb}" y1="${rod}" x2="${xb}" y2="${tob}" stroke="var(--ink-soft)" stroke-width="8" stroke-linecap="round"/>
+    <line x1="${xb - 8}" y1="${tob + 8}" x2="${xb + 30}" y2="${tob + 8}" stroke="var(--ink-soft)" stroke-width="5" stroke-linecap="round"/>
+    ${punto(hom, 'Acromion')}${punto(cad, 'Trocánter mayor')}${punto(rod, 'Epicóndilo lateral')}${punto(tob, 'Maléolo lateral')}
+    ${cota(hom, cad, 'Tronco')}${cota(cad, rod, 'Fémur')}${cota(rod, tob, 'Tibia')}`;
+}
+
+function renderModelo() {
+  const W = 320, H = 190, x0 = 34, y0 = 160, xMax = 120, yMin = -10, yMax = 80;
+  const X = v => x0 + v / xMax * (W - x0 - 18), Y = v => y0 - (v - yMin) / (yMax - yMin) * (y0 - 10);
+  const pts = [];
+  for (let m = 0; m <= 120; m += 4) pts.push([m, Modelo.rango(perfil, m)]);
+  const esp = pts.map(([m, r], i) => `${i ? 'L' : 'M'}${X(m).toFixed(1)},${Y(r.esperado).toFixed(1)}`).join(' ');
+  const banda = pts.map(([m, r], i) => `${i ? 'L' : 'M'}${X(m).toFixed(1)},${Y(limitar(r.hi, yMin, yMax)).toFixed(1)}`).join(' ')
+    + ' ' + pts.slice().reverse().map(([m, r]) => `L${X(m).toFixed(1)},${Y(limitar(r.lo, yMin, yMax)).toFixed(1)}`).join(' ') + ' Z';
+  const obj = perfil.profundidadObjetivo, rObj = Modelo.rango(perfil, obj), lim = Modelo.limiteDispositivo(perfil);
+  const ejes = [0, 30, 60, 90, 120].map(v => `<text x="${X(v)}" y="${y0 + 16}" text-anchor="middle" font-size="11" fill="var(--ink-soft)">${v}°</text>`).join('')
+    + [0, 20, 40, 60, 80].map(v => `<line x1="${x0}" y1="${Y(v)}" x2="${W - 8}" y2="${Y(v)}" stroke="var(--line)"/><text x="${x0 - 6}" y="${Y(v) + 4}" text-anchor="end" font-size="11" fill="var(--ink-soft)">${v}°</text>`).join('');
+  $('graficaModelo').innerHTML = `<g font-family="Barlow, sans-serif">${ejes}
+    <path d="${banda}" fill="var(--tronco)" opacity=".18"/>
+    <path d="${esp}" fill="none" stroke="var(--tronco)" stroke-width="2.5"/>
+    <line x1="${x0}" y1="${Y(lim)}" x2="${W - 8}" y2="${Y(lim)}" stroke="var(--mal)" stroke-dasharray="5 5"/>
+    <line x1="${X(obj)}" y1="10" x2="${X(obj)}" y2="${y0}" stroke="var(--muslo)" stroke-width="1.5"/>
+    <circle cx="${X(obj)}" cy="${Y(rObj.esperado)}" r="5" fill="var(--tronco)" stroke="var(--surface)" stroke-width="2"/>
+    <text x="${W - 8}" y="${Y(lim) - 5}" text-anchor="end" font-size="11" fill="var(--mal)">vibra por encima de ${lim}°</text>
+    <text x="${(x0 + W) / 2}" y="${H - 2}" text-anchor="middle" font-size="11" fill="var(--ink-soft)">Inclinación del muslo</text>
+    <text x="10" y="${(y0 + 10) / 2}" transform="rotate(-90 10 ${(y0 + 10) / 2})" text-anchor="middle" font-size="11" fill="var(--ink-soft)">Tronco</text></g>`;
+  const fact = Modelo.esperado(perfil, obj).factible;
+  $('fraseModelo').innerHTML = fact
+    ? `Con tus medidas y ${Modelo.cargas[perfil.carga].nombre}, en una sentadilla a <b>${obj}°</b> de muslo tu tronco debería estar cerca de <b>${red(rObj.esperado)}°</b> (rango aceptable <b>${red(rObj.lo)}–${red(rObj.hi)}°</b>).`
+    : `Con tu dorsiflexión actual el modelo no encuentra una postura equilibrada a ${obj}°. Prueba una profundidad menor o mejora la movilidad del tobillo.`;
+  const n = perfil.referencias.length, aj = Modelo.ajustePersonal(perfil);
+  $('notaAjuste').innerHTML = n
+    ? `Ajuste personal: ${aj >= 0 ? '+' : ''}${aj.toFixed(1)}°, calculado con ${n} repetición${n === 1 ? '' : 'es'} marcada${n === 1 ? '' : 's'} como técnica correcta. <button class="enlace" id="btnBorrarAjuste" type="button">Borrar ajuste</button>`
+    : 'Para afinar el modelo, haz unas repeticiones supervisadas por un profesional y márcalas como técnica correcta en Repeticiones.';
+}
+
+function renderPerfil() { renderProporciones(); renderDiagrama(); renderModelo(); renderNotaDispositivo(); }
+
+// ---------- Historial ----------
+function renderHistorial() {
+  const cont = $('listaSesiones');
+  const lista = sesiones.filter(s => s.reps.length).slice().reverse();
+  if (!lista.length) { cont.innerHTML = '<p class="vacio">Las sesiones con al menos una repetición se guardan aquí, en este teléfono.</p>'; return; }
+  cont.innerHTML = lista.map(s => {
+    const ok = s.reps.filter(r => r.fuera === 0).length, pct = red(100 * ok / s.reps.length);
+    const f = new Date(s.inicio).toLocaleString('es-CO', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+    return `<div class="sesion-fila">
+      <div><h3>${f}</h3><span class="meta">${s.reps.length} repeticiones, ${pct} % todo en rango${s.modo === 'demo' ? ', demostración' : ''}${s === app.sesion ? ', en curso' : ''}</span></div>
+      <span class="etiqueta ${pct >= 70 ? 'bien' : 'mal'}">${ok}/${s.reps.length}</span>
+      <div class="barra-ok"><i style="width:${pct}%"></i></div>
+      <div class="acciones">
+        <button class="enlace" data-ver="${s.id}">Ver repeticiones</button>
+        <button class="enlace" data-csv="${s.id}">Exportar CSV</button>
+        ${s === app.sesion ? '' : `<button class="enlace" style="color:var(--mal)" data-borrar="${s.id}">Borrar</button>`}
+      </div></div>`;
+  }).join('');
+}
+
+function csvSesion(s) {
+  const ids = ['prof', 'tronco', 'retro', 'cadera', 'tempo', 'flex', 'tsub', 'tmax'];
+  const enc = ['repeticion', 'hora', 'profundidad_deg', 'tronco_fondo_deg', 'retroversion_deg', 'subida_cadera_deg', 'bajada_s', 'flexion_cadera_max_deg', 'subida_s', 'tronco_max_deg',
+    'tronco_esperado_deg', 'fuera_de_rango', 'parametros_fuera', 'alertas_dispositivo', 'referencia'];
+  const filas = s.reps.map(r => {
+    const v = id => { const p = r.params.find(x => x.id === id); return p && p.valor !== null ? p.valor : ''; };
+    const fuera = r.params.filter(p => !p.ok).map(p => p.id).join(' ');
+    return [r.n, new Date(r.hora).toISOString(), ...ids.map(v), red(r.esperadoFondo), r.fuera, fuera, `"${textoAlertas(r.alertas)}"`, r.referencia ? 1 : 0].join(',');
+  });
+  const cab = `# perfil: femur=${s.perfil.femur}cm tibia=${s.perfil.tibia}cm tronco=${s.perfil.tronco}cm dorsiflexion=${s.perfil.dorsiflexion} objetivo=${s.perfil.profundidadObjetivo} carga=${s.perfil.carga} ${s.perfil.cargaKg}kg`;
+  return [cab, enc.join(','), ...filas].join('\n');
+}
+
+async function exportarCSV(id) {
+  const s = sesiones.find(x => x.id === id); if (!s) return;
+  const nombre = `sentadilla_${new Date(s.inicio).toISOString().slice(0, 16).replace(/[:T]/g, '-')}.csv`;
+  const texto = csvSesion(s);
+  try {
+    const descargas = window.claude && window.claude.use ? await window.claude.use('downloads') : null;
+    if (descargas) { await descargas.save({ filename: nombre, data: texto }); toast('CSV guardado.'); return; }
+  } catch (e) { if (e && e.code === 'declined') return; }
+  try {
+    const url = URL.createObjectURL(new Blob([texto], { type: 'text/csv' }));
+    const a = document.createElement('a'); a.href = url; a.download = nombre; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  } catch (e) { toast('No se pudo exportar el archivo en esta vista.'); }
+}
+
+// ---------- Navegación ----------
+const VISTAS = ['vivo', 'repeticiones', 'perfil', 'historial'];
+function irA(v) {
+  if (!VISTAS.includes(v)) v = 'vivo';
+  VISTAS.forEach(n => $('vista-' + n).classList.toggle('activa', n === v));
+  document.querySelectorAll('.nav a').forEach(a => { if (a.dataset.vista === v) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+  if (v === 'repeticiones') renderReps();
+  if (v === 'perfil') { llenarPerfil(); renderPerfil(); }
+  if (v === 'historial') renderHistorial();
+  window.scrollTo(0, 0);
+}
+function renderTodo() { renderEstado(); renderVivo(); renderReps(); renderHistorial(); actualizarBadge(); }
+
+// =====================================================================
+//  Eventos
+// =====================================================================
+window.addEventListener('hashchange', () => irA(location.hash.slice(1)));
+$('btnConectar').addEventListener('click', conectarBLE);
+$('btnDemo').addEventListener('click', iniciarDemo);
+$('btnDesconectar').addEventListener('click', () => { if (app.sesion) enviarComando('STOP'); terminarConexion(); });
+$('btnSesion').addEventListener('click', () => {
+  if (app.estadoDisp === 1 || app.estadoDisp === 2) enviarComando('STOP');
+  else { app.historia = []; enviarComando('START'); }
+});
+$('btnCal').addEventListener('click', () => enviarComando('CAL'));
+$('btnEnviarUmbrales').addEventListener('click', async () => {
+  await enviarComando('T=' + Modelo.limiteDispositivo(perfil));
+  await enviarComando('R=' + red(perfil.retroMax));
+  await enviarComando('H=' + red(perfil.caderaMax));
+  toast('Límites enviados al dispositivo.');
+});
+$('btnEstimar').addEventListener('click', () => {
+  const est = parseFloat($('pEstatura').value) || perfil.estatura;
+  Object.assign(perfil, Modelo.estimar(est));
+  llenarPerfil(); leerPerfil(); renderPerfil();
+  toast('Medidas estimadas. Mídelas con cinta para mayor precisión.');
+});
+CAMPOS.forEach(([id]) => $(id).addEventListener('change', () => { leerPerfil(); renderPerfil(); renderVivo(); }));
+CAMPOS.forEach(([id]) => $(id).addEventListener('input', () => { if ($(id).value !== '') { leerPerfil(); renderModelo(); renderProporciones(); renderDiagrama(); } }));
+document.addEventListener('click', e => {
+  const t = e.target.closest('button'); if (!t) return;
+  if (t.id === 'btnBorrarAjuste') { perfil.referencias = []; almacen.escribir(CLAVE_PERFIL, perfil); renderModelo(); toast('Ajuste personal borrado.'); }
+  if (t.dataset.ref) {
+    const [sid, n] = t.dataset.ref.split('|');
+    const s = sesiones.find(x => x.id === sid), rep = s && s.reps.find(r => r.n === +n);
+    if (!rep) return;
+    rep.referencia = !rep.referencia;
+    // Residuo = tronco medido − tronco que predice el modelo base a esa profundidad
+    perfil.referencias = sesiones.flatMap(se => se.reps.filter(r => r.referencia).map(r => r.troncoFondo - Modelo.troncoBase(perfil, r.prof).angulo)).slice(-15);
+    almacen.escribir(CLAVE_PERFIL, perfil); guardarSesiones();
+    renderReps();
+    toast(rep.referencia ? 'Repetición usada para ajustar tu modelo.' : 'Repetición quitada del ajuste.');
+  }
+  if (t.dataset.ver) { app.sesionVista = t.dataset.ver; location.hash = 'repeticiones'; }
+  if (t.dataset.csv) exportarCSV(t.dataset.csv);
+  if (t.dataset.borrar) {
+    if (!confirm('¿Borrar esta sesión del historial?')) return;
+    sesiones = sesiones.filter(s => s.id !== t.dataset.borrar); guardarSesiones(); renderHistorial();
+  }
+});
+$('selSesion').addEventListener('change', e => { app.sesionVista = e.target.value; renderReps(); });
+$('soloFuera').addEventListener('change', renderReps);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && app.sesion) pedirPantallaEncendida(true); });
+
+// Sesiones que quedaron abiertas (p. ej. se cerró la app): se dan por terminadas
+sesiones.forEach(s => { if (!s.fin) s.fin = s.inicio; });
+sesiones = sesiones.filter(s => s.reps.length);
+
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+llenarPerfil();
+renderTodo();
+irA(location.hash.slice(1) || 'vivo');
+requestAnimationFrame(dibujarGrafica);
+</script>
+</body>
+</html>
